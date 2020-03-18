@@ -31,8 +31,7 @@ void loop() {
   Serial.print(t);
   Serial.print(F("°C  Heat index: "));
   Serial.print(hic);
-  Serial.print(F("°C"));
-  Serial.print("  Light: ");
+  Serial.print(F("°C  Light: "));
   Serial.print(lux);
-  Serial.println(" lx ");
+  Serial.println(" lx");
 }
