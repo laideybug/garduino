@@ -2,6 +2,7 @@
 #include <BH1750.h>
 #include <DHT.h>
 #include <PubSubClient.h>
+#include <RTClib.h>
 #include <SoftwareSerial.h>
 #include <WiFiEsp.h>
 #include <Wire.h>
@@ -12,6 +13,9 @@ DHT dht(DHT_PIN, DHT22);
 
 // BH1750
 BH1750 lightMeter;
+
+// DS1307
+RTC_DS1307 rtc;
 
 // ESP8266
 #define RX 12
@@ -32,6 +36,8 @@ void setup() {
   Wire.begin();
   dht.begin();
   lightMeter.begin();
+  rtc.begin();
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   setupWiFi();
   client.setServer(mqttServer, 1883);
   connectMQTTBroker();
@@ -43,28 +49,32 @@ void loop() {
   }
   client.loop();
 
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-  float hic = dht.computeHeatIndex(t, h, false);
+  uint32_t tim = rtc.now().unixtime();
+  float hum = dht.readHumidity();
+  float tmp = dht.readTemperature();
+  float hic = dht.computeHeatIndex(tmp, hum, false);
   float lux = lightMeter.readLightLevel(true);
 
   Serial.print(F("Humidity: "));
-  Serial.print(h);
+  Serial.print(hum);
   Serial.print(F("%  Temperature: "));
-  Serial.print(t);
+  Serial.print(tmp);
   Serial.print(F("°C  Heat index: "));
   Serial.print(hic);
   Serial.print(F("°C  Light: "));
   Serial.print(lux);
-  Serial.println(" lx");
+  Serial.print(" lx");
+  Serial.print("  Timestamp: ");
+  Serial.println(tim);
 
-  StaticJsonDocument<128> doc;
-  doc["humidity"] = h;
-  doc["temperature"]   = t;
+  StaticJsonDocument<140> doc;
+  doc["humidity"] = hum;
+  doc["temperature"]   = tmp;
   doc["heat_index"] = hic;
   doc["lux"] = lux;
+  doc["timestamp"] = tim;
 
-  char buffer[128];
+  char buffer[140];
   size_t n = serializeJson(doc, buffer);
   client.publish("outTopic", buffer, n);
   delay(3000);
