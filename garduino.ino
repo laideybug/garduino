@@ -44,6 +44,8 @@ const char* password = ".........";
 const char* mqttUser = ".........";
 const char* mqttPass = ".........";
 const char* mqttHost = ".........";
+const char* mqttPubTopic = "/sensors/status";
+const char* mqttClientID = "garduino_01";
 PubSubClient client(espClient);
 
 void setup() {
@@ -68,15 +70,15 @@ void loop() {
 
   uint32_t t = rtc.now().unixtime();
   float hum = dht.readHumidity();
-  float tmp = dht.readTemperature();
-  float hic = dht.computeHeatIndex(tmp, hum, false);
+  float temp = dht.readTemperature();
+  float hic = dht.computeHeatIndex(temp, hum, false);
   float lux = lightMeter.readLightLevel(true);
   float soil = analogRead(SOIL_PIN);
 
   DEBUG_PRINT(F("[Garduino] Humidity: "));
   DEBUG_PRINT(hum);
   DEBUG_PRINT(F("%  Temperature: "));
-  DEBUG_PRINT(tmp);
+  DEBUG_PRINT(temp);
   DEBUG_PRINT(F("°C  Heat index: "));
   DEBUG_PRINT(hic);
   DEBUG_PRINT(F("°C  Light: "));
@@ -88,7 +90,7 @@ void loop() {
   
   StaticJsonDocument<JSON_OBJECT_SIZE(6)> doc;
   doc["hum"] = hum;
-  doc["temp"] = tmp;
+  doc["temp"] = temp;
   doc["hic"] = hic;
   doc["lux"] = lux;
   doc["soil"] = soil;
@@ -96,7 +98,7 @@ void loop() {
 
   char buffer[256];
   serializeJson(doc, buffer);
-  if(client.publish("/sensors/status", buffer)) {
+  if(client.publish(mqttPubTopic, buffer)) {
     DEBUG_PRINT_LN("  Publish succeeded");
   } else {
     DEBUG_PRINT_LN("  Publish failed");
@@ -124,7 +126,7 @@ void setupWiFi() {
 
 void connectMQTTBroker() {
   while (!client.connected()) {
-    if (client.connect("garduino", mqttUser, mqttPass)) {
+    if (client.connect(mqttClientID, mqttUser, mqttPass)) {
       DEBUG_PRINT(F("[Garduino] Connected to "));
       DEBUG_PRINT_LN(mqttHost);
     } else {
