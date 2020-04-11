@@ -25,6 +25,9 @@ DHT dht(DHT_PIN, DHT22);
 // BH1750
 BH1750 lightMeter;
 
+// Soil Moisture Sensor
+#define SOIL_PIN A0
+
 // DS1307
 RTC_DS1307 rtc;
 
@@ -35,12 +38,12 @@ SoftwareSerial esp8266(RX,TX);
 WiFiEspClient espClient;
 
 // MQTT
+#define MQTT_PORT 1883
 const char* ssid = ".........";
 const char* password = ".........";
 const char* mqttUser = ".........";
 const char* mqttPass = ".........";
-const char* mqttServer = ".........";
-#define MQTT_PORT 1883
+const char* mqttHost = ".........";
 PubSubClient client(espClient);
 
 void setup() {
@@ -68,6 +71,7 @@ void loop() {
   float tmp = dht.readTemperature();
   float hic = dht.computeHeatIndex(tmp, hum, false);
   float lux = lightMeter.readLightLevel(true);
+  float soil = analogRead(SOIL_PIN);
 
   DEBUG_PRINT(F("[Garduino] Humidity: "));
   DEBUG_PRINT(hum);
@@ -77,14 +81,17 @@ void loop() {
   DEBUG_PRINT(hic);
   DEBUG_PRINT(F("°C  Light: "));
   DEBUG_PRINT(lux);
-  DEBUG_PRINT(F(" lx  Timestamp: "));
+  DEBUG_PRINT(F(" lx  Soil moisture level: "));
+  DEBUG_PRINT(soil);
+  DEBUG_PRINT(F("  Timestamp: "));
   DEBUG_PRINT(t);
   
-  StaticJsonDocument<JSON_OBJECT_SIZE(5)> doc;
+  StaticJsonDocument<JSON_OBJECT_SIZE(6)> doc;
   doc["hum"] = hum;
   doc["temp"] = tmp;
   doc["hic"] = hic;
   doc["lux"] = lux;
+  doc["soil"] = soil;
   doc["time"] = t;
 
   char buffer[256];
