@@ -128,7 +128,7 @@ void connectMQTTBroker() {
       DEBUG_PRINT(F("[Garduino] Connected to "));
       DEBUG_PRINT_LN(mqttHost);
     } else {
-      DEBUG_PRINT(F("[Garduino] failed, rc="));
+      DEBUG_PRINT(F("[Garduino] Connection failed, rc="));
       DEBUG_PRINT(client.state());
       DEBUG_PRINT_LN(F(" try again in 5 seconds"));
       delay(5000);
