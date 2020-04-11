@@ -7,6 +7,17 @@
 #include <WiFiEsp.h>
 #include <Wire.h>
 
+// Debug Mode
+#define DEBUG
+
+#ifdef DEBUG
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_PRINT_LN(x) Serial.println(x)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINT_LN(x)
+#endif
+
 // DHT
 #define DHT_PIN 4
 DHT dht(DHT_PIN, DHT22);
@@ -29,17 +40,20 @@ const char* password = ".........";
 const char* mqttUser = ".........";
 const char* mqttPass = ".........";
 const char* mqttServer = ".........";
+#define MQTT_PORT 1883
 PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(9600);
+  Serial.println();
   Wire.begin();
   dht.begin();
   lightMeter.begin();
   rtc.begin();
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // Only need to seed the initial RTC time once
+  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   setupWiFi();
-  client.setServer(mqttServer, 1883);
+  client.setServer(mqttHost, MQTT_PORT);
   connectMQTTBroker();
 }
 
@@ -49,48 +63,51 @@ void loop() {
   }
   client.loop();
 
-  uint32_t tim = rtc.now().unixtime();
+  uint32_t t = rtc.now().unixtime();
   float hum = dht.readHumidity();
   float tmp = dht.readTemperature();
   float hic = dht.computeHeatIndex(tmp, hum, false);
   float lux = lightMeter.readLightLevel(true);
 
-  Serial.print(F("Humidity: "));
-  Serial.print(hum);
-  Serial.print(F("%  Temperature: "));
-  Serial.print(tmp);
-  Serial.print(F("°C  Heat index: "));
-  Serial.print(hic);
-  Serial.print(F("°C  Light: "));
-  Serial.print(lux);
-  Serial.print(" lx");
-  Serial.print("  Timestamp: ");
-  Serial.println(tim);
-
-  StaticJsonDocument<140> doc;
-  doc["humidity"] = hum;
-  doc["temperature"]   = tmp;
-  doc["heat_index"] = hic;
+  DEBUG_PRINT(F("[Garduino] Humidity: "));
+  DEBUG_PRINT(hum);
+  DEBUG_PRINT(F("%  Temperature: "));
+  DEBUG_PRINT(tmp);
+  DEBUG_PRINT(F("°C  Heat index: "));
+  DEBUG_PRINT(hic);
+  DEBUG_PRINT(F("°C  Light: "));
+  DEBUG_PRINT(lux);
+  DEBUG_PRINT(F(" lx  Timestamp: "));
+  DEBUG_PRINT(t);
+  
+  StaticJsonDocument<JSON_OBJECT_SIZE(5)> doc;
+  doc["hum"] = hum;
+  doc["temp"] = tmp;
+  doc["hic"] = hic;
   doc["lux"] = lux;
-  doc["timestamp"] = tim;
+  doc["time"] = t;
 
-  char buffer[140];
-  size_t n = serializeJson(doc, buffer);
-  client.publish("outTopic", buffer, n);
+  char buffer[256];
+  serializeJson(doc, buffer);
+  if(client.publish("/sensors/status", buffer)) {
+    DEBUG_PRINT_LN("  Publish succeeded");
+  } else {
+    DEBUG_PRINT_LN("  Publish failed");
+  }
+  
   delay(3000);
 }
 
 void setupWiFi() {
-  delay(10);
   esp8266.begin(9600);
   WiFi.init(&esp8266);
 
   if (WiFi.status() == WL_NO_SHIELD) {
     while (true);
   }
-  
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+
+  DEBUG_PRINT(F("[Garduino] Connecting to "));
+  DEBUG_PRINT_LN(ssid);
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -100,13 +117,13 @@ void setupWiFi() {
 
 void connectMQTTBroker() {
   while (!client.connected()) {
-    if (client.connect("Garduino", mqttUser, mqttPass)) {
-      Serial.print("Connected to ");
-      Serial.println(mqttServer);
+    if (client.connect("garduino", mqttUser, mqttPass)) {
+      DEBUG_PRINT(F("[Garduino] Connected to "));
+      DEBUG_PRINT_LN(mqttHost);
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      DEBUG_PRINT(F("[Garduino] failed, rc="));
+      DEBUG_PRINT(client.state());
+      DEBUG_PRINT_LN(F(" try again in 5 seconds"));
       delay(5000);
     }
   }
