@@ -19,14 +19,17 @@
 #endif
 
 // DHT
-#define DHT_PIN 4
+#define DHT_PIN 2
 DHT dht(DHT_PIN, DHT22);
 
 // BH1750
 BH1750 lightMeter;
 
 // Soil Moisture Sensor
-#define SOIL_PIN A0
+#define SOIL_LWR 120
+#define SOIL_UPR 530
+#define SOIL_DAT A0
+#define SOIL_PWR 7
 
 // DS1307
 RTC_DS1307 rtc;
@@ -54,12 +57,15 @@ void setup() {
   Wire.begin();
   dht.begin();
   lightMeter.begin();
+  pinMode(SOIL_PWR, OUTPUT);
+  digitalWrite(SOIL_PWR, LOW);
   rtc.begin();
   // Only need to seed the initial RTC time once
   //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   setupWiFi();
   client.setServer(mqttHost, MQTT_PORT);
   connectMQTTBroker();
+  delay(3000);
 }
 
 void loop() {
@@ -73,7 +79,10 @@ void loop() {
   float temp = dht.readTemperature();
   float hic = dht.computeHeatIndex(temp, hum, false);
   float lux = lightMeter.readLightLevel(true);
-  float soil = analogRead(SOIL_PIN);
+  digitalWrite(SOIL_PWR, HIGH);
+  delay(10);
+  long soil = map(analogRead(SOIL_DAT), SOIL_LWR, SOIL_UPR, 0, 100);
+  digitalWrite(SOIL_PWR, LOW);
 
   DEBUG_PRINT(F("[Garduino] Humidity: "));
   DEBUG_PRINT(hum);
@@ -83,9 +92,9 @@ void loop() {
   DEBUG_PRINT(hic);
   DEBUG_PRINT(F("°C  Light: "));
   DEBUG_PRINT(lux);
-  DEBUG_PRINT(F(" lx  Soil moisture level: "));
+  DEBUG_PRINT(F(" lx  Soil moisture: "));
   DEBUG_PRINT(soil);
-  DEBUG_PRINT(F("  Timestamp: "));
+  DEBUG_PRINT(F("%  Timestamp: "));
   DEBUG_PRINT(t);
   
   StaticJsonDocument<JSON_OBJECT_SIZE(6)> doc;
@@ -98,7 +107,7 @@ void loop() {
 
   char buffer[256];
   serializeJson(doc, buffer);
-  if(client.publish(mqttPubTopic, buffer)) {
+  if (client.publish(mqttPubTopic, buffer)) {
     DEBUG_PRINT_LN("  Publish succeeded");
   } else {
     DEBUG_PRINT_LN("  Publish failed");
